@@ -29,9 +29,19 @@ var (
 	ErrInvalidProtocol = errors.New("invalid protocol")
 	ErrConsumed        = errors.New("peer consumed more than sent")
 	ErrGoAway          = errors.New("stream id overflows, should start a new connection")
-	ErrTimeout         = errors.New("timeout")
 	ErrWouldBlock      = errors.New("operation would block on IO")
 )
+
+// ErrTimeout is used when we reach an IO deadline
+var ErrTimeout error = &timeoutError{}
+
+// timeoutError is returned for an expired deadline.
+type timeoutError struct{}
+
+// Implement the net.Error interface.
+func (e *timeoutError) Error() string   { return "i/o deadline reached" }
+func (e *timeoutError) Timeout() bool   { return true }
+func (e *timeoutError) Temporary() bool { return true }
 
 type writeRequest struct {
 	class  CLASSID
@@ -234,6 +244,7 @@ func (s *Session) notifyReadError(err error) {
 		s.socketReadError.Store(err)
 		close(s.chSocketReadError)
 	})
+	_ = s.Close()
 }
 
 func (s *Session) notifyWriteError(err error) {
@@ -241,6 +252,7 @@ func (s *Session) notifyWriteError(err error) {
 		s.socketWriteError.Store(err)
 		close(s.chSocketWriteError)
 	})
+	_ = s.Close()
 }
 
 func (s *Session) notifyProtoError(err error) {
@@ -248,6 +260,7 @@ func (s *Session) notifyProtoError(err error) {
 		s.protoError.Store(err)
 		close(s.chProtoError)
 	})
+	_ = s.Close()
 }
 
 // IsClosed does a safe check to see if we have shutdown
